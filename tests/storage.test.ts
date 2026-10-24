@@ -20,3 +20,17 @@ test('a lost round can set a score but does not add a cup', () => {
   data.clear(); const g = new Game(); g.status = 'lost'; g.score = 600; const r = finishRecord(readRecord(), g);
   assert.equal(r.best, 600); assert.equal(r.deliveries, 0); assert.equal(r.fastest, null); assert.equal(r.routes.length, 0);
 });
+
+test('changing the current result cup replaces one delivery without adding cups or erasing earlier ones', () => {
+  data.clear();
+  const baseline = { best: 5000, fastest: 10, deliveries: 2, routes: ['tea'] as const, muted: false };
+  const g = new Game(); g.status = 'won'; g.score = 6000; g.elapsed = 12;
+  g.route = 'desk';
+  const first = finishRecord({ ...baseline, routes: [...baseline.routes] }, g);
+  assert.equal(first.deliveries, 3); assert.deepEqual(first.routes, ['tea', 'desk']);
+  g.route = 'sport';
+  const reassigned = finishRecord({ ...baseline, routes: [...baseline.routes], muted: true }, g);
+  assert.equal(reassigned.deliveries, 3); assert.deepEqual(reassigned.routes, ['tea', 'sport']);
+  assert.equal(reassigned.best, first.best); assert.equal(reassigned.fastest, first.fastest);
+  assert.equal(reassigned.muted, true); assert.deepEqual(baseline.routes, ['tea']);
+});

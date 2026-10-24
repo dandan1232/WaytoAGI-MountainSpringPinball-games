@@ -39,9 +39,7 @@ document.querySelector('#app')!.innerHTML = `
       <div class="journey" aria-label="送水旅程">
         <div class="journey-step current" data-stage="source"><span class="step-marker">${icon('drop')}</span><div><span class="step-overline">THE SOURCE</span><h2>地下 <strong>180</strong> 米</h2><p>撞响岩层，唤醒一滴天然山泉</p></div><span class="step-complete">${icon('check')}</span></div>
         <div class="journey-step" data-stage="bottling"><span class="step-marker">${icon('leaf')}</span><div><span class="step-overline">THE PROMISE</span><h2>源头的第一份清甜</h2><p>击中灌装站，把新鲜好好封存</p></div><span class="step-complete">${icon('check')}</span></div>
-        <div class="journey-step" data-stage="delivery"><span class="step-marker">${icon('fork')}</span><div><span class="step-overline">THE JOURNEY</span><h2><strong>72</strong> 小时 → <strong>72</strong> 秒</h2><p>选一条小路，把山泉送进杯子</p></div><span class="step-complete">${icon('check')}</span></div>
       </div>
-      <div class="source-note"><span class="source-note-icon">${icon('leaf')}</span><div>每一滴，都有来处。<small>源自江南山林 · 洞庭天然山泉</small></div></div>
     </section>
 
     <section class="game-column" id="game-column" aria-label="山泉弹珠台游戏">
@@ -78,7 +76,7 @@ let record = readRecord();
 audio.setMuted(record.muted);
 let wasStatus = game.status, wasStage = game.stage, lastFrame = performance.now(), toastUntil = 0, overlayState = '', recordSaved = false;
 let rulesPaused = false;
-let pendingRoute: Route | null = null;
+let roundBaseline = { ...record, routes: [...record.routes] };
 
 function toast(message: string): void { $('game-toast').textContent = message; $('game-toast').classList.add('visible'); toastUntil = performance.now() + 2700; }
 function updateRecord(): void {
@@ -94,20 +92,28 @@ function updateSound(): void {
   $('sound').setAttribute('aria-pressed', String(audio.muted));
 }
 function selectRoute(route: Route): void {
-  if (game.status === 'won' || game.status === 'lost') { pendingRoute = route; toast(`下一杯送往${ROUTE_INFO[route].short} · 再玩一次出发`); }
-  else game.route = route;
+  const changed = game.route !== route;
+  game.route = route;
   document.querySelectorAll<HTMLElement>('[data-route]').forEach(el => { const selected = el.dataset.route === route; el.classList.toggle('selected', selected); el.setAttribute('aria-pressed', String(selected)); });
+  if (game.status === 'won' && changed) {
+    // Reassign this round's single delivery from its original baseline.
+    // Selecting another cup must not mint an extra delivery or lose prior cups.
+    record = finishRecord({ ...roundBaseline, muted: audio.muted }, game);
+    recordSaved = true; updateRecord(); overlayState = ''; sync(false);
+    audio.unlock(); audio.stop(); audio.melody(game.notes);
+    toast(`本局已送达${ROUTE_INFO[route].short}`);
+  }
 }
-function cycleRoute(): void { selectRoute(ROUTES[(ROUTES.indexOf(pendingRoute ?? game.route) + 1) % 3]); }
+function cycleRoute(): void { selectRoute(ROUTES[(ROUTES.indexOf(game.route) + 1) % 3]); }
 function start(): void {
-  if (pendingRoute) { game.route = pendingRoute; pendingRoute = null; }
+  roundBaseline = { ...record, routes: [...record.routes] };
   audio.unlock(); audio.stop(); renderer.reset(); game.start(); recordSaved = false; overlayState = ''; wasStage = 'source';
   $('start-panel').hidden = true; $('overlay').hidden = true;
   $('board-wrap').classList.add('started');
   if (window.innerWidth < 900) $('game-column')?.scrollIntoView?.({ block: 'start', behavior: renderer.reducedMotion ? 'instant' : 'smooth' });
 }
 
-function sync(): void {
+function sync(moveFocus = true): void {
   const playing = game.status === 'playing', paused = game.status === 'paused', finished = game.status === 'won' || game.status === 'lost';
   $('score').textContent = String(game.score).padStart(6, '0');
   $('timer').textContent = String(Math.ceil(game.remaining)).padStart(2, '0');
@@ -130,7 +136,7 @@ function sync(): void {
     const i = stages.indexOf(el.dataset.stage!), current = stages.indexOf(game.stage);
     el.classList.toggle('current', i === current); el.classList.toggle('complete', i < current || game.status === 'won');
   });
-  if (finished && !recordSaved) { record = finishRecord(record, game); recordSaved = true; updateRecord(); }
+  if (finished && !recordSaved) { record = finishRecord({ ...roundBaseline, muted: audio.muted }, game); recordSaved = true; updateRecord(); }
   if (paused || finished) {
     if (overlayState !== game.status) {
       overlayState = game.status; $('overlay').hidden = false;
@@ -140,7 +146,7 @@ function sync(): void {
       $('resume')?.addEventListener('click', () => { audio.unlock(); game.togglePause(); });
       $('play-again')?.addEventListener('click', start); $('overlay-restart')?.addEventListener('click', start);
       $('replay-music')?.addEventListener('click', () => { audio.unlock(); audio.stop(); audio.melody(game.notes); });
-      if (!document.querySelector('dialog[open]')) ($('resume') ?? $('play-again'))?.focus({ preventScroll: true });
+      if (moveFocus && !document.querySelector('dialog[open]')) ($('resume') ?? $('play-again'))?.focus({ preventScroll: true });
     }
   } else { $('overlay').hidden = true; overlayState = ''; }
 }
