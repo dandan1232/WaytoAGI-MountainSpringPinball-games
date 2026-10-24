@@ -1,6 +1,7 @@
 import { BUMPERS, GATES, ROUTES, ROUTE_INFO, STATION } from './model';
 import type { Game, GameEvent, Route } from './model';
 import { flipper, HEIGHT, RAILS, WIDTH } from './physics';
+import { fitViewport } from './viewport';
 
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; r: number };
 const INK = '#174c40';
@@ -13,7 +14,6 @@ export class Renderer {
   private flashes = new Map<string, number>();
   private product = new Image();
   private forest = new Image();
-  private projection = 1;
   reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -26,14 +26,9 @@ export class Renderer {
     new ResizeObserver(() => this.resize()).observe(this.canvas);
   }
   resize(): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(1, this.canvas.clientWidth), height = Math.max(1, this.canvas.clientHeight);
-    this.canvas.width = Math.round(width * dpr); this.canvas.height = Math.round(height * dpr);
-    const nextProjection = (width / WIDTH) / (height / HEIGHT);
-    const changed = Math.abs(nextProjection - this.projection) > 0.001;
-    this.projection = nextProjection;
-    this.ctx.setTransform(dpr * width / WIDTH, 0, 0, dpr * height / HEIGHT, 0, 0);
-    if (changed) this.drawScenery();
+    const view = fitViewport(this.canvas.clientWidth, this.canvas.clientHeight, window.devicePixelRatio || 1);
+    this.canvas.width = view.pixelWidth; this.canvas.height = view.pixelHeight;
+    this.ctx.setTransform(view.scale, 0, 0, view.scale, view.offsetX, view.offsetY);
   }
   reset(): void { this.trail = []; this.particles = []; this.flashes.clear(); }
   private shape(c: CanvasRenderingContext2D, path: string, color: string, stroke?: string, width = 1): void {
@@ -45,8 +40,7 @@ export class Renderer {
     if (stroke) { c.strokeStyle = stroke; c.lineWidth = width; c.stroke(); }
   }
   private text(c: CanvasRenderingContext2D, text: string, x: number, y: number, size = 12, color = INK, font = 'sans-serif'): void {
-    c.save(); c.translate(x, y); c.scale(1 / this.projection, 1);
-    c.font = `600 ${size}px ${font}`; c.fillStyle = color; c.textAlign = 'center'; c.fillText(text, 0, 0); c.restore();
+    c.font = `600 ${size}px ${font}`; c.fillStyle = color; c.textAlign = 'center'; c.fillText(text, x, y);
   }
   private tree(c: CanvasRenderingContext2D, x: number, y: number, scale = 1, tone = 0): void {
     c.save(); c.translate(x, y); c.scale(scale, scale);
@@ -85,10 +79,9 @@ export class Renderer {
       c.strokeStyle = '#6a9c6510'; c.lineWidth = 1; c.stroke();
     }
     if (this.forest.complete && this.forest.naturalWidth) {
-      // Crop the real supplied mountain photograph for the final screen aspect,
-      // compensating for the table's foreshortening so the photo stays natural.
+      // Crop the supplied photograph without changing its natural proportions.
       const x = 32, y = 27, w = 476, h = 427;
-      const aspect = w * this.projection / h;
+      const aspect = w / h;
       const imageAspect = this.forest.naturalWidth / this.forest.naturalHeight;
       const sw = imageAspect > aspect ? this.forest.naturalHeight * aspect : this.forest.naturalWidth;
       const sh = imageAspect > aspect ? this.forest.naturalHeight : this.forest.naturalWidth / aspect;
@@ -146,7 +139,9 @@ export class Renderer {
     if (event.type === 'rescue' || event.type === 'launch') this.trail = [];
   }
   render(game: Game, dt: number, time: number): void {
-    const c = this.ctx; c.clearRect(0, 0, WIDTH, HEIGHT); c.drawImage(this.scenery, 0, 0, WIDTH, HEIGHT);
+    const c = this.ctx;
+    c.save(); c.resetTransform(); c.clearRect(0, 0, this.canvas.width, this.canvas.height); c.restore();
+    c.drawImage(this.scenery, 0, 0, WIDTH, HEIGHT);
     for (const [key, value] of this.flashes) { const next = value - dt * 3; if (next <= 0) this.flashes.delete(key); else this.flashes.set(key, next); }
     for (const [i, b] of BUMPERS.entries()) {
       const flash = this.flashes.get(`${b.x},${b.y}`) ?? 0;
@@ -169,8 +164,7 @@ export class Renderer {
     this.circle(c, STATION.x, STATION.y, STATION.r - 4, '#e2efd3', active ? '#439a73' : '#adc7a0', 1.5);
     if (active) { c.globalAlpha = glow; this.circle(c, STATION.x, STATION.y, 53, '#e9f9c012', '#fff7b7', 3); c.globalAlpha = 1; }
     if (this.product.complete && this.product.naturalWidth) {
-      c.save(); c.translate(STATION.x, STATION.y); c.scale(1 / this.projection, 1);
-      c.drawImage(this.product, -14, -32, 28, 55); c.restore();
+      c.drawImage(this.product, STATION.x - 14, STATION.y - 32, 28, 55);
     }
     else { this.circle(c, STATION.x, STATION.y, 16, '#69b8c5'); this.text(c, '泉', STATION.x, STATION.y + 6, 17, '#fff'); }
     this.text(c, '源 头 灌 装 站', STATION.x, STATION.y + 63, 11, '#3a7056');
@@ -223,7 +217,7 @@ export class Renderer {
     c.restore();
   }
   private drop(c: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-    c.save(); c.translate(x, y); c.scale(1 / this.projection, 1);
+    c.save(); c.translate(x, y);
     c.beginPath(); c.ellipse(2, r + 5, r + 1, 4, 0, 0, Math.PI * 2); c.fillStyle = '#285c4530'; c.fill();
     const g = c.createRadialGradient(-4, -4, 1, 0, 0, r * 1.5); g.addColorStop(0, '#e0fffa'); g.addColorStop(0.45, '#82e0d1'); g.addColorStop(1, '#2a9c9a');
     c.beginPath(); c.moveTo(0, -r * 1.6); c.bezierCurveTo(-r * 0.3, -r * 0.6, -r, -r * 0.4, -r, r * 0.2);
