@@ -81,4 +81,10 @@
 - 18 项自动化测试及生产构建通过；实际游戏通关，结算后三个杯子仍可立即切换，分数 4940、耗时 8.26 秒、送达数 1 不变。浏览器错误列表为空。
 - 已人工查看桌面游玩截图 `artifacts/shape-desktop-playing.png`，圆形机关、房屋、挡板和照片均恢复正常比例。
 
-### W2 正式环境 — 待部署验证
+### W2 正式环境 — 已发布，发布文件核对通过
+
+- 修复提交：`cd3c0fd`；[GitHub Actions](https://github.com/dandan1232/WaytoAGI-MountainSpringPinball-games/actions/runs/40118921643) 已完成且为 `success`。
+- Vercel 部署 `mountain-spring-pinball-de53glvwa-dandan1232s-projects.vercel.app` 为 `Ready / Production`，原正式域名已更新。
+- 正式首页无登录请求返回 HTTP 200，引用的 `index-Or-T_xHF.css` 和 `index-BwNQcsX9.js` 与本地通过检查的生产构建完全一致。
+- 额外验证 1093 × 614 / DPR 1.25 的缩放后小窗口：球台约 326 × 495px，圆形比例 1，球台与按钮均完整可见。
+- 验证限制：线上自动浏览器发生 `net::ERR_CONNECTION_CLOSED`，代理和禁用 HTTP/2 的重试也失败，未获得有效的线上画面截图；未将错误页截图用作通过证据。Windows 画面与操作验证使用同一提交的本地真实浏览器完成，发布验证采用 Vercel Ready、成功 CI 与正式首页构建文件哈希对照。
