@@ -7,9 +7,9 @@
   const read = () => window.__spring;
   assert('no horizontal overflow', document.documentElement.scrollWidth <= innerWidth);
   for (const route of ['tea', 'desk', 'sport']) {
-    document.querySelector(`[data-route="${route}"]`).click();
-    const start = document.querySelector('#play-again') ?? document.querySelector('#start');
+    const start = read().status === 'ready' ? document.querySelector('#start') : document.querySelector('#restart');
     start.click();
+    document.querySelector(`[data-route="${route}"]`).click();
     await wait(100);
     key('keydown', 'ArrowLeft'); key('keydown', 'ArrowRight');
     const began = performance.now();

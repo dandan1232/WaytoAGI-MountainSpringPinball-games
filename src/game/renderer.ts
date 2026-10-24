@@ -12,18 +12,28 @@ export class Renderer {
   private trail: { x: number; y: number }[] = [];
   private flashes = new Map<string, number>();
   private product = new Image();
+  private forest = new Image();
+  private projection = 1;
   reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
     this.scenery.width = WIDTH * 2; this.scenery.height = HEIGHT * 2;
     this.product.src = '/brand/spring-water.webp';
     this.product.onload = () => this.drawScenery();
+    this.forest.src = '/brand/source-forest.webp';
+    this.forest.onload = () => this.drawScenery();
     this.drawScenery(); this.resize();
+    new ResizeObserver(() => this.resize()).observe(this.canvas);
   }
   resize(): void {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.canvas.width = WIDTH * dpr; this.canvas.height = HEIGHT * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const width = Math.max(1, this.canvas.clientWidth), height = Math.max(1, this.canvas.clientHeight);
+    this.canvas.width = Math.round(width * dpr); this.canvas.height = Math.round(height * dpr);
+    const nextProjection = (width / WIDTH) / (height / HEIGHT);
+    const changed = Math.abs(nextProjection - this.projection) > 0.001;
+    this.projection = nextProjection;
+    this.ctx.setTransform(dpr * width / WIDTH, 0, 0, dpr * height / HEIGHT, 0, 0);
+    if (changed) this.drawScenery();
   }
   reset(): void { this.trail = []; this.particles = []; this.flashes.clear(); }
   private shape(c: CanvasRenderingContext2D, path: string, color: string, stroke?: string, width = 1): void {
@@ -35,7 +45,8 @@ export class Renderer {
     if (stroke) { c.strokeStyle = stroke; c.lineWidth = width; c.stroke(); }
   }
   private text(c: CanvasRenderingContext2D, text: string, x: number, y: number, size = 12, color = INK, font = 'sans-serif'): void {
-    c.font = `600 ${size}px ${font}`; c.fillStyle = color; c.textAlign = 'center'; c.fillText(text, x, y);
+    c.save(); c.translate(x, y); c.scale(1 / this.projection, 1);
+    c.font = `600 ${size}px ${font}`; c.fillStyle = color; c.textAlign = 'center'; c.fillText(text, 0, 0); c.restore();
   }
   private tree(c: CanvasRenderingContext2D, x: number, y: number, scale = 1, tone = 0): void {
     c.save(); c.translate(x, y); c.scale(scale, scale);
@@ -73,11 +84,21 @@ export class Renderer {
       c.beginPath(); c.ellipse(265, 415, 95 + i * 21, 120 + i * 26, -0.25, 0, Math.PI * 2);
       c.strokeStyle = '#6a9c6510'; c.lineWidth = 1; c.stroke();
     }
-    this.shape(c, 'M20 213 Q65 161 100 170 Q145 60 185 102 Q226 37 267 119 Q300 83 328 130 Q369 57 410 137 Q470 102 520 211L520 260 20 260Z', '#b3cc9f');
-    this.shape(c, 'M18 238Q58 188 108 211Q161 114 204 162Q235 107 279 189Q329 124 365 194Q408 127 461 207Q495 188 524 224L524 270 18 270Z', '#88b18a');
-    this.shape(c, 'M122 226Q166 144 185 169L159 235Z', '#a5c593');
-    this.shape(c, 'M306 223Q355 143 369 171L351 230Z', '#a5c593');
-    this.shape(c, 'M20 267Q92 210 155 238Q222 184 291 232Q365 184 441 240Q485 221 523 246L523 305 20 305Z', '#659d7d');
+    if (this.forest.complete && this.forest.naturalWidth) {
+      // Crop the real supplied mountain photograph for the final screen aspect,
+      // compensating for the table's foreshortening so the photo stays natural.
+      const x = 32, y = 27, w = 476, h = 427;
+      const aspect = w * this.projection / h;
+      const imageAspect = this.forest.naturalWidth / this.forest.naturalHeight;
+      const sw = imageAspect > aspect ? this.forest.naturalHeight * aspect : this.forest.naturalWidth;
+      const sh = imageAspect > aspect ? this.forest.naturalHeight : this.forest.naturalWidth / aspect;
+      c.drawImage(this.forest, (this.forest.naturalWidth - sw) / 2, (this.forest.naturalHeight - sh) * 0.35, sw, sh, x, y, w, h);
+      const fade = c.createLinearGradient(0, 170, 0, y + h);
+      fade.addColorStop(0, '#e2ecd100'); fade.addColorStop(0.55, '#e2ecd132'); fade.addColorStop(1, '#e2ecd1');
+      c.fillStyle = fade; c.fillRect(x, 170, w, y + h - 170);
+      c.fillStyle = '#f3f8e9ed'; c.beginPath(); c.roundRect(158, 44, 226, 60, 15); c.fill();
+      this.text(c, '洞庭山林 · 实景', 401, 155, 11, '#f5f8e9');
+    }
     for (let i = 0; i < 12; i++) this.tree(c, 75 + i * 34, 231 + Math.sin(i * 2) * 15, 0.45 + (i % 3) * 0.13, i);
     this.house(c, 218, 220, 0.66); this.house(c, 260, 206, 0.86); this.house(c, 302, 225, 0.67);
     // A spring becomes a river, and the river becomes a pinball rail.
@@ -147,7 +168,10 @@ export class Renderer {
     this.circle(c, STATION.x, STATION.y, STATION.r + 3, active ? '#b6e4c2' : '#cbe3ca', '#f5ffe5', 3);
     this.circle(c, STATION.x, STATION.y, STATION.r - 4, '#e2efd3', active ? '#439a73' : '#adc7a0', 1.5);
     if (active) { c.globalAlpha = glow; this.circle(c, STATION.x, STATION.y, 53, '#e9f9c012', '#fff7b7', 3); c.globalAlpha = 1; }
-    if (this.product.complete && this.product.naturalWidth) c.drawImage(this.product, STATION.x - 14, STATION.y - 32, 28, 55);
+    if (this.product.complete && this.product.naturalWidth) {
+      c.save(); c.translate(STATION.x, STATION.y); c.scale(1 / this.projection, 1);
+      c.drawImage(this.product, -14, -32, 28, 55); c.restore();
+    }
     else { this.circle(c, STATION.x, STATION.y, 16, '#69b8c5'); this.text(c, '泉', STATION.x, STATION.y + 6, 17, '#fff'); }
     this.text(c, '源 头 灌 装 站', STATION.x, STATION.y + 63, 11, '#3a7056');
     this.gate(c, game, time);
@@ -168,7 +192,7 @@ export class Renderer {
         this.trail.forEach((p, i) => { c.globalAlpha = i / this.trail.length * 0.28; this.circle(c, p.x, p.y, 3 + i / 4, '#f4fffa'); }); c.globalAlpha = 1;
       }
       const idle = game.status === 'ready' && !this.reducedMotion ? Math.sin(time * 2) * 3 : 0;
-      this.drop(c, game.ball.x, game.ball.y + idle, game.ball.r);
+      this.drop(c, game.ball.x, game.ball.y + idle, game.ball.r * 1.25);
     }
     this.particles = this.particles.filter(p => p.life > 0);
     for (const p of this.particles) {
@@ -199,7 +223,7 @@ export class Renderer {
     c.restore();
   }
   private drop(c: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-    c.save(); c.translate(x, y);
+    c.save(); c.translate(x, y); c.scale(1 / this.projection, 1);
     c.beginPath(); c.ellipse(2, r + 5, r + 1, 4, 0, 0, Math.PI * 2); c.fillStyle = '#285c4530'; c.fill();
     const g = c.createRadialGradient(-4, -4, 1, 0, 0, r * 1.5); g.addColorStop(0, '#e0fffa'); g.addColorStop(0.45, '#82e0d1'); g.addColorStop(1, '#2a9c9a');
     c.beginPath(); c.moveTo(0, -r * 1.6); c.bezierCurveTo(-r * 0.3, -r * 0.6, -r, -r * 0.4, -r, r * 0.2);

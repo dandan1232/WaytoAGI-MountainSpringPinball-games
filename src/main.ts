@@ -21,6 +21,7 @@ const icons: Record<string, string> = {
   check: '<path d="m5 12 4 4L19 6"/>',
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
   trophy: '<path d="M7 3h10v7a5 5 0 0 1-10 0V3Zm0 2H3v4a4 4 0 0 0 4 4m10-8h4v4a4 4 0 0 1-4 4m-5 2v5m-5 1h10"/>',
+  expand: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',
 };
 const icon = (name: string, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -43,7 +44,7 @@ document.querySelector('#app')!.innerHTML = `
     </section>
 
     <section class="game-column" id="game-column" aria-label="山泉弹珠台游戏">
-      <div class="game-topline"><span><i></i> 山泉弹珠台</span><span class="edition">VOL. 01 / JIANGNAN</span></div>
+      <div class="game-topline"><span><i></i> 山泉弹珠台 <small class="edition">JIANGNAN / 实景山林</small></span><button id="expand-game" class="expand-button" aria-pressed="false">${icon('expand')}<span>放大游戏</span></button></div>
       <div class="game-shell">
         <div class="hud"><div class="hud-score"><span class="hud-label">本局清甜值</span><strong id="score">000000</strong></div><div class="hud-timer"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="timer-track" cx="22" cy="22" r="19"/><circle id="timer-ring" cx="22" cy="22" r="19"/></svg><div><strong id="timer">72</strong><span>秒</span></div></div><div class="hud-actions"><button id="pause" class="icon-button" aria-label="暂停游戏" disabled>${icon('pause')}</button><button id="restart" class="icon-button" aria-label="重新开始" disabled>${icon('reset')}</button></div></div>
         <div class="board-wrap" id="board-wrap"><canvas id="board" width="540" height="820" role="img" aria-label="江南山城弹珠台：岩层机关、中央源头灌装站、下方配送入口和左右挡板。请使用下方按钮或键盘操作。"></canvas>
@@ -103,14 +104,28 @@ function selectRoute(route: Route): void {
     audio.unlock(); audio.stop(); audio.melody(game.notes);
     toast(`本局已送达${ROUTE_INFO[route].short}`);
   }
+  if (window.innerWidth <= 900 && game.status !== 'ready') {
+    const target = game.status === 'won' ? $('overlay') : $('game-column');
+    target.scrollIntoView({ block: game.status === 'won' ? 'center' : 'start', behavior: 'instant' });
+  }
 }
 function cycleRoute(): void { selectRoute(ROUTES[(ROUTES.indexOf(game.route) + 1) % 3]); }
+function setFocused(focused: boolean): void {
+  document.body.classList.toggle('is-focused', focused);
+  $('expand-game').setAttribute('aria-pressed', String(focused));
+  $('expand-game').innerHTML = icon('expand') + `<span>${focused ? '返回介绍' : '放大游戏'}</span>`;
+  requestAnimationFrame(() => {
+    renderer.resize();
+    if (focused && window.innerWidth <= 900) $('game-column').scrollIntoView({ block: 'start', behavior: 'instant' });
+    else window.scrollTo({ top: 0, behavior: 'instant' });
+  });
+}
 function start(): void {
   roundBaseline = { ...record, routes: [...record.routes] };
   audio.unlock(); audio.stop(); renderer.reset(); game.start(); recordSaved = false; overlayState = ''; wasStage = 'source';
   $('start-panel').hidden = true; $('overlay').hidden = true;
   $('board-wrap').classList.add('started');
-  if (window.innerWidth < 900) $('game-column')?.scrollIntoView?.({ block: 'start', behavior: renderer.reducedMotion ? 'instant' : 'smooth' });
+  setFocused(true);
 }
 
 function sync(moveFocus = true): void {
@@ -152,6 +167,7 @@ function sync(moveFocus = true): void {
 }
 
 $('start').addEventListener('click', start);
+$('expand-game').addEventListener('click', () => setFocused(!document.body.classList.contains('is-focused')));
 $('launch').addEventListener('click', () => { audio.unlock(); game.launch(); });
 $('pause').addEventListener('click', () => { audio.unlock(); audio.stop(); game.togglePause(); });
 $('restart').addEventListener('click', start);
