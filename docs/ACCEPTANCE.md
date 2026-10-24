@@ -23,7 +23,17 @@
 - 桌面与手机截图已人工查看；Canvas 商品图、山城纵深、文本、配色与触摸控件正常。浏览器错误列表为空。
 - 验收截图与原始浏览器结果保存在本地忽略目录 `artifacts/`：`desktop-first.png`、`mobile-playing.png`、`tablet-tested.png`、`browser-smoke.json`。
 - M2 提交 `dcd2601` 的 GitHub Actions `Verify game` 已完成且为 `success`；本地类型检查、15 项测试和生产构建在体验调整后再次通过。
+- 刷新后成功恢复 3/3 杯子纪录；模拟浏览器失焦后立即暂停并释放挡板；开启系统减少动态设置后媒体查询与 CSS 过渡均正确切换。
+- 体验验收提交 `28b2e0d` 已推送到 `origin/main`，GitHub Actions 同样成功。
 
-## M4 Vercel 上线 — 待部署
+## M4 Vercel 上线 — 通过
 
-Vercel CLI 已使用用户账号登录；正式 URL 与线上验证结果在部署完成后记录。
+- 正式可玩地址：<https://mountain-spring-pinball.vercel.app>
+- Vercel 项目：`mountain-spring-pinball`，已连接 `dandan1232/WaytoAGI-MountainSpringPinball-games` GitHub 仓库。
+- 首次正式部署的代码提交：`28b2e0d15be4c56070a09901e64ae2fdfea28fab`。
+- 部署 ID：`dpl_6n73EL5ZfPxMxiCbqk7ofQmwyGfZ`，Vercel 返回 `READY`，正式域名已绑定。
+- 用无 Vercel 登录凭据的普通 HTTP 请求验证：正式域名返回 **HTTP 200**；独立浏览器会话直接显示游戏，没有登录门槛。
+- 正式环境实际试玩球场路线：14.37 秒通过三阶段，6480 分，3 次救援完整保留，运动杯成功入账。实际商品图加载成功，浏览器错误列表为空。
+- 线上结算截图：本地 `artifacts/production-won.png`。
+- 对应 GitHub Actions：[Verify game · 40115064236](https://github.com/dandan1232/WaytoAGI-MountainSpringPinball-games/actions/runs/40115064236)，结论 `success`。
+- 本验收点只补充文档与正式链接，游戏代码保持为已通过本地和线上验证的版本；之后 `main` 的推送会触发 Vercel 自动部署。
