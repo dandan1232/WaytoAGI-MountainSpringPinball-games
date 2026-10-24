@@ -1,0 +1,7 @@
+.git/
+artifacts/
+docs/
+tests/
+.github/
+README.md
+public/brand/README.md
