@@ -92,6 +92,11 @@ export class Game {
     this.rightAmount += ((this.right ? 1 : 0) - this.rightAmount) * Math.min(1, dt * 24);
     if (!this.ball.launched) return;
     const ball = this.ball;
+    // Open delivery rails gently guide nearby water toward the selected fork.
+    // The ball still has to physically enter that route's cup sensor.
+    if (this.stage === 'delivery' && ball.y > 440 && ball.y < 615 && Math.abs(ball.x - this.gate.x) < 115) {
+      ball.vx += (this.gate.x - ball.x) * 10 * dt;
+    }
     integrate(ball, dt);
     if (ball.x > 463 && ball.y < 163) {
       ball.x = 435; ball.y = 157; ball.vx = -345; ball.vy = 90;

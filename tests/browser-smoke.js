@@ -2,7 +2,7 @@
 (async () => {
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const results = [];
-  const assert = (name, condition, detail = '') => { results.push({ name, pass: !!condition, detail }); if (!condition) throw new Error(name + ': ' + detail); };
+  const assert = (name, condition, detail = '') => { results.push({ name, pass: !!condition, detail }); window.__springQaProgress = results; if (!condition) throw new Error(name + ': ' + detail); };
   const key = (type, code) => document.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
   const read = () => window.__spring;
   assert('no horizontal overflow', document.documentElement.scrollWidth <= innerWidth);
